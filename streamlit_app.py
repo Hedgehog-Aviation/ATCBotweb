@@ -99,7 +99,7 @@ async def on_ready():
     watch_vatsim_atc.start()
 
     # 🔧 DEBUG MODE ENABLED
-    debug_ping.start()
+    #debug_ping.start()
     # 🔧 COMMENT OUT THE LINE ABOVE TO DISABLE DEBUG MODE
 
 # =======================
