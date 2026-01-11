@@ -20,6 +20,9 @@ intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 active_atcs = set()
 
+# =======================
+# VATSIM FETCH
+# =======================
 async def fetch_vatsim_atcs():
     """Fetch list of currently online ATC positions we're watching."""
     try:
@@ -35,6 +38,9 @@ async def fetch_vatsim_atcs():
         print(f"Error fetching VATSIM data: {e}")
         return set()
 
+# =======================
+# NORMAL ATC WATCHER
+# =======================
 @tasks.loop(seconds=30)
 async def watch_vatsim_atc():
     global active_atcs
@@ -63,10 +69,41 @@ async def watch_vatsim_atc():
 
     active_atcs = atcs_now
 
+# =======================
+# DEBUG TASK (PING EVERY 10 SECONDS)
+# COMMENT THIS OUT WHEN DONE TESTING
+# =======================
+@tasks.loop(seconds=10)
+async def debug_ping():
+    guild = client.get_guild(GUILD_ID)
+    if not guild:
+        print("[DEBUG] Guild not found")
+        return
+
+    channel = guild.get_channel(CHANNEL_ID)
+    if not channel:
+        print("[DEBUG] Channel not found")
+        return
+
+    await channel.send(
+        f":warning: **DEBUG MODE** – bot heartbeat ping <@&{ROLE_ID}>"
+    )
+    print("[DEBUG] Sent debug ping")
+
+# =======================
+# BOT READY
+# =======================
 @client.event
 async def on_ready():
     print(f"{client.user} logged in - starting monitor.")
     watch_vatsim_atc.start()
 
+    # 🔧 DEBUG MODE ENABLED
+    debug_ping.start()
+    # 🔧 COMMENT OUT THE LINE ABOVE TO DISABLE DEBUG MODE
+
+# =======================
+# RUN BOT
+# =======================
 if __name__ == "__main__":
     client.run(DISCORD_TOKEN)
