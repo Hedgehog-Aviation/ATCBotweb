@@ -2,6 +2,7 @@ import discord
 import requests
 import streamlit as st
 from discord.ext import tasks
+from discord import app_commands
 
 # =======================
 # BOT CONFIGURATION
@@ -18,7 +19,12 @@ VATSIM_JSON_URL = "https://data.vatsim.net/v3/vatsim-data.json"
 
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
+tree = app_commands.CommandTree(client)
+
 active_atcs = set()
+
+# user_id -> set of callsigns
+user_monitors = {}
 
 # =======================
 # VATSIM FETCH
@@ -39,11 +45,39 @@ async def fetch_vatsim_atcs():
         return set()
 
 # =======================
-# NORMAL ATC WATCHER
+# SLASH COMMANDS
+# =======================
+@tree.command(name="monitor", description="Monitor a custom ATC station")
+@app_commands.describe(callsign="ATC callsign (e.g. ML_TWR) or 'clear'")
+async def monitor(interaction: discord.Interaction, callsign: str):
+    user_id = interaction.user.id
+    callsign = callsign.upper()
+
+    if user_id not in user_monitors:
+        user_monitors[user_id] = set()
+
+    if callsign == "CLEAR":
+        user_monitors[user_id].clear()
+        await interaction.response.send_message(
+            "✅ Your monitored ATC stations have been cleared.",
+            ephemeral=True
+        )
+        return
+
+    user_monitors[user_id].add(callsign)
+    await interaction.response.send_message(
+        f"📡 You are now monitoring **{callsign}**.\n"
+        f"You will be notified when it logs on or off.",
+        ephemeral=True
+    )
+
+# =======================
+# ATC WATCHER
 # =======================
 @tasks.loop(seconds=30)
 async def watch_vatsim_atc():
     global active_atcs
+
     atcs_now = await fetch_vatsim_atcs()
     guild = client.get_guild(GUILD_ID)
     if not guild:
@@ -58,49 +92,58 @@ async def watch_vatsim_atc():
     logged_on = atcs_now - active_atcs
     logged_off = active_atcs - atcs_now
 
+    # ATC LOGGED ON
     for callsign in logged_on:
         await channel.send(
             f":green_circle: {callsign} has just logged **ON**! <@&{ROLE_ID}>"
         )
+
+        for user_id, stations in user_monitors.items():
+            if callsign in stations:
+                await channel.send(
+                    f"🔔 <@{user_id}> — **{callsign}** you are monitoring is now **ONLINE**"
+                )
+
+    # ATC LOGGED OFF
     for callsign in logged_off:
         await channel.send(
             f":red_circle: {callsign} has just logged **OFF**! <@&{ROLE_ID}>"
         )
 
+        for user_id, stations in user_monitors.items():
+            if callsign in stations:
+                await channel.send(
+                    f"🔕 <@{user_id}> — **{callsign}** you are monitoring is now **OFFLINE**"
+                )
+
     active_atcs = atcs_now
 
 # =======================
-# DEBUG TASK (PING EVERY 10 SECONDS)
-# COMMENT THIS OUT WHEN DONE TESTING
+# DEBUG TASK (DISABLED)
 # =======================
-@tasks.loop(seconds=10)
-async def debug_ping():
-    guild = client.get_guild(GUILD_ID)
-    if not guild:
-        print("[DEBUG] Guild not found")
-        return
-
-    channel = guild.get_channel(CHANNEL_ID)
-    if not channel:
-        print("[DEBUG] Channel not found")
-        return
-
-    await channel.send(
-        f":warning: **DEBUG MODE** – bot heartbeat ping <@&{ROLE_ID}>"
-    )
-    print("[DEBUG] Sent debug ping")
+# @tasks.loop(seconds=10)
+# async def debug_ping():
+#     guild = client.get_guild(GUILD_ID)
+#     if not guild:
+#         return
+#     channel = guild.get_channel(CHANNEL_ID)
+#     if not channel:
+#         return
+#     await channel.send(":warning: DEBUG heartbeat ping")
 
 # =======================
 # BOT READY
 # =======================
 @client.event
 async def on_ready():
-    print(f"{client.user} logged in - starting monitor.")
+    print(f"{client.user} logged in.")
+
+    await tree.sync(guild=discord.Object(id=GUILD_ID))
+    print("Slash commands synced.")
+
     watch_vatsim_atc.start()
 
-    # 🔧 DEBUG MODE ENABLED
-    #debug_ping.start()
-    # 🔧 COMMENT OUT THE LINE ABOVE TO DISABLE DEBUG MODE
+    # debug_ping.start()  # intentionally disabled
 
 # =======================
 # RUN BOT
