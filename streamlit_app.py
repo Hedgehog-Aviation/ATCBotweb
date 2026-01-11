@@ -73,23 +73,23 @@ async def watch_vatsim_atc():
 # DEBUG TASK (PING EVERY 10 SECONDS)
 # COMMENT THIS OUT WHEN DONE TESTING
 # =======================
-@tasks.loop(seconds=10)
-async def debug_ping():
-    guild = client.get_guild(GUILD_ID)
-    if not guild:
-        print("[DEBUG] Guild not found")
-        return
-
-    channel = guild.get_channel(CHANNEL_ID)
-    if not channel:
-        print("[DEBUG] Channel not found")
-        return
-
-    await channel.send(
-        f":warning: **DEBUG MODE** – bot heartbeat ping <@&{ROLE_ID}>"
-    )
-    print("[DEBUG] Sent debug ping")
-
+#@tasks.loop(seconds=10)
+#async def debug_ping():
+#    guild = client.get_guild(GUILD_ID)
+#    if not guild:
+ #       print("[DEBUG] Guild not found")
+  #      return
+#
+#    channel = guild.get_channel(CHANNEL_ID)
+#    if not channel:
+#        print("[DEBUG] Channel not found")
+#        return
+#
+#    await channel.send(
+#        f":warning: **DEBUG MODE** – bot heartbeat ping <@&{ROLE_ID}>"
+#    )
+#    print("[DEBUG] Sent debug ping")
+#
 # =======================
 # BOT READY
 # =======================
